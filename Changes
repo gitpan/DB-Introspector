@@ -1,0 +1,3 @@
+* Implemented MySQL support (Alpha)
+* Handling type attributes (length, not null, etc)
+* Refactored a bit out of CommonRDB and placed into Introspector.pm

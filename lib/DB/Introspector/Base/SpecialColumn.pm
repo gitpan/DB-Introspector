@@ -1,4 +1,4 @@
-package DB::Introspector::Base::IntegerColumn;
+package DB::Introspector::Base::SpecialColumn;
 
 use strict;
 
@@ -8,24 +8,9 @@ sub new {
     my $class = shift;
     my $name = shift;
 
-    my $min = shift;
-    my $max = shift;
-
     my $self = $class->SUPER::new($name);
-    $self->{_min} = $min;
-    $self->{_max} = $max;
 
     return $self;
-}
-
-sub min {
-    my $self = shift;
-    return $self->{_min};
-}
-
-sub max {
-    my $self = shift;
-    return $self->{_max};
 }
 
 1;
@@ -33,7 +18,7 @@ __END__
 
 =head1 NAME
 
-DB::Introspector::Base::IntegerColumn
+DB::Introspector::Base::SpecialColumn
 
 =head1 EXTENDS
 
@@ -43,13 +28,13 @@ DB::Introspector::Base::Column
 
 =over 4
 
-use DB::Introspector::Base::IntegerColumn;
+use DB::Introspector::Base::SpecialColumn;
 
 =back
      
 =head1 DESCRIPTION
 
-DB::Introspector::Base::IntegerColumn provides a way to distinguish a Integer
+DB::Introspector::Base::SpecialColumn provides a way to distinguish a Special
 type from another column type.
 
 =head1 SEE ALSO
@@ -71,7 +56,7 @@ Masahji C. Stewart
 
 =head1 COPYRIGHT
 
-The DB::Introspector::Base::IntegerColumn module is free software; you can
+The DB::Introspector::Base::SpecialColumn module is free software; you can
 redistribute it and/or modify it under the same terms as Perl itself.
 
 =cut

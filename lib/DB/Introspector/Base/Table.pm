@@ -76,6 +76,12 @@ sub non_primary_key_columns {
     return grep { !$self->is_primary_key_column($_) } $self->columns;
 } 
 
+sub non_primary_key_column_names {
+    my $self = shift;
+
+    return map { $_->name; } $self->non_primary_key_columns;
+} 
+
 sub column_names {
     my $self = shift;
     return map { $_->name; } $self->columns;

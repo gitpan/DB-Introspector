@@ -2,7 +2,7 @@ use strict;
 
 use ExtUtils::MakeMaker;
 
-my $VERSION = q(0.02);
+my $VERSION = q(0.03);
 
 
 WriteMakefile(

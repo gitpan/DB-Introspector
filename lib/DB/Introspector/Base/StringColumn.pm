@@ -4,12 +4,28 @@ use strict;
 
 use base qw( DB::Introspector::Base::Column );
 
-sub min_length {
+sub new {
+    my $class = shift;
+    my $name = shift;
 
+    my $min = shift;
+    my $max = shift;
+
+    my $self = $class->SUPER::new($name);
+    $self->{_min} = $min;
+    $self->{_max} = $max;
+
+    return $self;
+}
+
+sub min_length {
+    my $self = shift;
+    return $self->{_min};
 }
 
 sub max_length {
-
+    my $self = shift;
+    return $self->{_max};
 }
 
 1;

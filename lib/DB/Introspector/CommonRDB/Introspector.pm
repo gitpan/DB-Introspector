@@ -25,34 +25,20 @@ sub get_table_class {
 
 ## DEFINED METHODS
 
-sub new {
-    my $class = shift;
-    my $self = $class->SUPER::new(@_);
-
-    $self->{_table_cache} = {};
-    $self;
-}
-
-sub find_table {
+sub lookup_table {
     my $self = shift;
     my $table_name = shift;
 
-    unless(defined $self->_cached_table($table_name)) {
-        my $sth = $self->get_single_table_lookup_statement($table_name);
-        my $row = $sth->fetchrow_hashref('NAME_uc');
-        $sth->finish();
-        return unless( defined $row );
-        
-        if (defined $row) { 
-            $self->_cache_table(
-                $self->get_table_instance($row->{TABLE_NAME_COL()}, 
-                                          $row->{OWNER_NAME_COL}));
-        }
-    }
-    return $self->_cached_table($table_name);
+    my $sth = $self->get_single_table_lookup_statement($table_name);
+    my $row = $sth->fetchrow_hashref('NAME_uc');
+    $sth->finish();
+    return undef unless( defined $row );
+
+    return $self->get_table_instance($row->{TABLE_NAME_COL()},
+                                     $row->{OWNER_NAME_COL()});
 }
 
-sub find_all_tables {
+sub lookup_all_tables {
     my $self = shift;
     my $table_name = shift;
 
@@ -76,21 +62,6 @@ sub get_table_instance {
     my $owner_name = shift;
 
     return $self->get_table_class->new($table_name, $owner_name, $self);
-}
-
-sub _cached_table {
-    my $self = shift;
-    my $table_name = shift;
-    return $self->{_table_cache}{$table_name};
-}
-
-sub _cache_table {
-    my $self = shift;
-
-    if(@_) {
-        my $table = shift;
-        $self->{_table_cache}{$table->name} = $table;
-    }
 }
 
 
@@ -128,8 +99,8 @@ sub get_foreign_key_class {
     die("get_foreign_key_class not defined");
 }
 
-sub get_depenency_class {
-    die("get_depenency_class not defined");
+sub get_dependency_class {
+    die("get_dependency_class not defined");
 }
 
 sub get_primary_key_column_ids {
@@ -181,7 +152,7 @@ sub columns {
         my @columns;
         while( my $row = $sth->fetchrow_hashref('NAME_uc') ) {
             my $column = $self->get_column_instance(
-                $row->{NAME}, $row->{TYPE});
+                $row->{NAME}, $row->{TYPE}, $row);
                 push(@columns, $column);
         }
         $sth->finish();

@@ -17,6 +17,8 @@ lib/DB/Introspector/CommonRDB/Introspector.pm
 lib/DB/Introspector/ForeignKeyPath.pm
 lib/DB/Introspector/MappedPath.pm
 lib/DB/Introspector/Postgres/Introspector.pm
+lib/DB/Introspector/Oracle/Introspector.pm
+lib/DB/Introspector/MySQL/Introspector.pm
 lib/DB/Introspector/Util/RelInspect.pm
 lib/DB/Introspector/driver.properties
 sql/create_oracle.sql

@@ -4,6 +4,13 @@ use strict;
 use DB::Introspector::ForeignKeyPath;
 use DB::Introspector::MappedPath;
 
+use vars qw( $SINGLETON );
+
+sub _instance {
+    my $class = shift;
+    $SINGLETON ||= bless(\$class, $class);
+    return $SINGLETON;
+}
 
 sub find_mapped_paths_between_tables {
     my $class = shift;
@@ -14,10 +21,12 @@ sub find_mapped_paths_between_tables {
 
     if( $root_table->name eq $child_table->name ) {
         unshift(@$path_list, $path);
-        return;
+        return [];
     }
 
     foreach my $foreign_key ($child_table->foreign_keys) {
+        next if($foreign_key->local_table->name 
+             eq $foreign_key->foreign_table->name);
         my $internal_path = $path->clone();
         $internal_path->prepend_foreign_key($foreign_key);
         $class->find_mapped_paths_between_tables( $root_table,

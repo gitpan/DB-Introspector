@@ -48,12 +48,17 @@ use strict;
 use base qw( DB::Introspector::CommonRDB::Table );
 
 use constant COLUMN_LOOKUP_QUERY =>
-q(SELECT LOWER(column_name) AS NAME, data_type AS TYPE FROM user_tab_columns
-  WHERE LOWER(table_name)=?);
+q(SELECT LOWER(column_name) AS NAME, data_type AS TYPE, 
+        DECODE(data_precision, NULL, data_length, data_precision) AS LENGTH 
+    FROM user_tab_columns
+    WHERE LOWER(table_name)=?);
 
+# TODO add support for cross schema references
 use constant FOREIGN_KEYS_LOOKUP_QUERY =>
 q(SELECT constraint_name AS name FROM user_constraints 
-  WHERE constraint_type='R' AND LOWER(table_name)=?);
+  WHERE constraint_type='R' 
+    AND LOWER(table_name)=?
+    AND owner=r_owner);
 
 use constant DEPENDENCIES_LOOKUP_QUERY =>
 q(SELECT dep.constraint_name AS name, dep.table_name AS child_table_name
@@ -71,6 +76,7 @@ q(SELECT LOWER(column_name) FROM user_cons_columns WHERE constraint_name IN (
  ) ORDER BY position); 
 
 use DB::Introspector::Base::BooleanColumn;
+use DB::Introspector::Base::SpecialColumn;
 use DB::Introspector::Base::IntegerColumn;
 use DB::Introspector::Base::CharColumn;
 use DB::Introspector::Base::CLOBColumn;
@@ -86,6 +92,8 @@ use constant COLUMN_CLASS_MAPPING => {
     'DATE' => 'DB::Introspector::Base::DateTimeColumn',
     'TIMESTAMP(6)' => 'DB::Introspector::Base::DateTimeColumn',
     'CLOB' => 'DB::Introspector::Base::CLOBColumn',
+    'ROWID' => 'DB::Introspector::Base::SpecialColumn',
+    'UROWID' => 'DB::Introspector::Base::SpecialColumn',
 };
 
 sub get_primary_key_column_ids {
@@ -144,10 +152,22 @@ sub get_column_instance {
     my $self = shift;
     my $name = shift;
     my $type_name = uc(shift);
+    my $extra_data = shift;
 
     my $class = COLUMN_CLASS_MAPPING()->{$type_name}
                             || die("class not found for type:$type_name");
-    return $class->new($name);
+
+    if($class->isa('DB::Introspector::Base::IntegerColumn')) {
+        # if we are dealing with an Integer then assume that our min and max
+        # length is dependent on the number of acceptable characters in the
+        # number
+        my $max = '9' x $extra_data->{LENGTH};
+        return $class->new($name, -$max, $max);
+    } elsif ($class->isa('DB::Introspector::Base::StringColumn')) {
+        return $class->new($name, 0, $extra_data->{LENGTH});
+    } else {
+        return $class->new($name);
+    }
 }
 
 sub get_foreign_key_class {

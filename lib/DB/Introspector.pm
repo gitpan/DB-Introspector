@@ -13,18 +13,54 @@ use vars qw( %REGISTRY %INC );
 DB::Introspector->register_drivers();
 
 
-sub find_table {
+sub lookup_table {
     my $self = shift;
-    die("find_table method not defined in ". (ref($self) || $self)); 
+    die("lookup_table method not defined in ". (ref($self) || $self)); 
+}
+
+sub lookup_all_tables {
+    my $self = shift;
+    die("lookup_all_tables method not defined in ". (ref($self) || $self)); 
 }
 
 
 sub find_all_tables {
     my $self = shift;
-    die("find_all_tables method not defined in ". (ref($self) || $self)); 
+
+    if( $self->_looked_up_all_tables ) {
+        return $self->_get_all_cached_tables;
+    } else {
+        foreach my $table ($self->lookup_all_tables) {
+            $self->_cache_table($table);
+        }
+        $self->_looked_up_all_tables(1);
+    }
 }
 
+sub _get_all_cached_tables {
+    my $self = shift;
+    my @tables = values %{$self->{_table_cache}};
+    return @tables;
+}
 
+sub _looked_up_all_tables {
+    my $self = shift;
+    if(@_) {
+        $self->{_looked_up_all_tables} = shift;
+    }
+    return $self->{_looked_up_all_tables};
+}
+
+sub find_table {
+    my $self = shift;
+    my $table_name = shift;
+
+    unless(defined $self->_cached_table($table_name)) {
+        my $table = $self->lookup_table($table_name);
+        $self->_cache_table($table) if( defined $table );
+    }
+    return $self->_cached_table($table_name);
+}
 
 sub register_drivers {
     my $class = shift;
@@ -98,6 +134,8 @@ sub new {
         _dbh => $dbh
     }, ref($class) || $class);
 
+    $self->{_table_cache} = {};
+
     $self;
 }
 
@@ -106,7 +144,23 @@ sub dbh {
     return $self->{_dbh};
 }
 
+sub _cached_table {
+    my $self = shift;
+    my $table_name = shift;
+    return $self->{_table_cache}{$table_name};
+}
 
+use Carp qw( cluck );
+sub _cache_table {
+    my $self = shift;
+
+    # TODO: Add some type checking here 
+    if(@_) {
+        my $table = shift;
+cluck($table) unless ref $table;
+        $self->{_table_cache}{$table->name} = $table;
+    }
+}
 
 1;
 __END__
