@@ -2,6 +2,8 @@ package DB::Introspector;
 
 use strict;
 
+$DB::Introspector::VERSION = '0.05';
+
 use DBI;
 use Config::Properties;
 use IO::File;
@@ -11,6 +13,7 @@ use constant DRIVER_PROPERTIES_FILE => 'driver.properties';
 use vars qw( %REGISTRY %INC );
 
 DB::Introspector->register_drivers();
+
 
 
 sub lookup_table {
@@ -141,6 +144,23 @@ sub new {
 sub dbh {
     my $self = shift;
     return $self->{_dbh};
+}
+
+sub _clear_dbh {
+    my $self = shift;
+    delete $self->{_dbh};
+}
+
+sub _set_dbh {
+    my $self = shift;
+    if( @_ ) {
+        my $dbh = shift;
+        unless( UNIVERSAL::isa($dbh, 'DBI::db') ) {
+            die("$dbh is not a DBI::db");
+        }
+        $self->{_dbh} = $dbh;
+    }
+
 }
 
 sub _cached_table {

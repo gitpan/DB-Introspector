@@ -1,3 +1,8 @@
+Version .05
+* First implementation of DB::Introspector::SerializeUtil, which is used to
+  cache DB::Introspector instances for those cases (when using Oracle) when
+  metadata traversal is slow.
+
 Version .04
 * Implemented support for Indexes
 * Fixed find_table bug (exploited when find_all_tables was called before find_table)
