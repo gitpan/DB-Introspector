@@ -256,6 +256,14 @@ sub add_foreign_keys {
     }
 }
 
+sub indexes {
+    my $self = shift;
+    unless( $self->{_fetched_indexes} ) {
+        $self->_fetch_indexes;
+    }
+    return @{$self->{_indexes}};
+}
+
 sub columns {
     my $self = shift;
     unless( $self->{_fetched_columns} ) {
@@ -315,6 +323,28 @@ sub _fetch_columns {
     $self->{_fetched_columns} = 1;
     $sth->finish;
 }
+
+sub _fetch_indexes {
+    my $self = shift;
+
+    my $sth = $self->introspector->dbh->prepare_cached(
+                'SHOW INDEXES FROM '.$self->name);
+    $sth->execute();
+
+    my %indexes;
+    while( my $row = $sth->fetchrow_hashref('NAME_lc') ) {
+        $indexes{key_name} ||= DB::Introspector::MySQL::Index->new($self, 
+                                                 !$row->{non_unique},
+                                                 $row->{key_name});
+        $indexes{key_name}->_set_column_name_for_index(
+            $row->{column_name},$row->{seq_in_index}-1);
+    }
+
+    $self->{_indexes} = [values %indexes];
+    $self->{_fetched_indexes} = 1;
+    $sth->finish;
+}
+
 
 sub foreign_keys {
     my $self = shift;
@@ -413,6 +443,35 @@ sub construct_char_column {
     my $column = new DB::Introspector::Base::CharColumn($name, 0, $max_width);
     $column->nullable($nullable);
     return $column;
+}
+
+package DB::Introspector::MySQL::Index;
+
+use strict;
+use base qw( DB::Introspector::Base::Index );
+
+
+sub new {
+    my $class = shift;
+
+    my $self = $class->SUPER::new(@_);
+    $self->{_name} = pop(@_);
+    $self->{_column_names} = [];
+    $self;
+}
+
+sub name { my $self = shift; return $self->{_name}; }
+
+sub column_names {
+    my $self = shift;
+    return @{$self->{_column_names}};
+}
+
+sub _set_column_name_for_index {
+    my $self = shift;
+    my $column_name = shift;
+    my $index = shift;
+    $self->{_column_names}[$index] = $column_name;
 }
 
 1;

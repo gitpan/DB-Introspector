@@ -80,6 +80,10 @@ sub get_column_lookup_statement {
     die("get_column_lookup_statement not defined");
 }
 
+sub get_indexes_lookup_statement {
+    die("get_indexes_lookup_statement not defined");
+}
+
 sub get_foreign_keys_lookup_statement {
     die("get_foreign_keys_lookup_statement not defined");
 }
@@ -173,6 +177,16 @@ sub foreign_keys {
     return @{$self->{'foreign_keys'}};
 }
 
+sub indexes {
+    my $self = shift;
+
+    unless( defined $self->{'indexes'} ) { 
+        $self->{'indexes'} = $self->_lookup_indexes;
+    }
+
+    return @{$self->{'indexes'}};
+}
+
 sub dependencies {
     my $self = shift;
 
@@ -195,6 +209,20 @@ sub _lookup_foreign_keys {
     $sth->finish();
 
     return \@foreign_keys;
+}
+
+sub _lookup_indexes {
+    my $self = shift;
+    my $sth = $self->get_indexes_lookup_statement();
+
+    my @indexes;
+    while( my $row = $sth->fetchrow_hashref('NAME_uc') ) {
+        my $index = $self->get_index_class()->new($self, %$row);
+        push(@indexes, $index);
+    }
+    $sth->finish();
+
+    return \@indexes;
 }
 
 sub _lookup_dependencies {
@@ -328,5 +356,46 @@ sub foreign_table {
     }
     return $self->{'foreign_table'};
 } 
+
+
+
+package DB::Introspector::CommonRDB::Index;
+
+use strict;
+
+use base qw( DB::Introspector::Base::Index );
+
+
+sub get_column_name_lookup_statement {
+    die("get_column_name_lookup_statement not defined");
+}
+
+## DEFINED METHODS
+
+sub column_names {
+    my $self = shift;
+
+    unless( defined $self->{'column_names'} ) {
+        my $sth = $self->get_column_name_lookup_statement();
+
+        my @column_names;
+        while( my $row = $sth->fetchrow_hashref('NAME_uc') ) {
+            push(@column_names, $row->{NAME});
+        }
+        $sth->finish();
+
+        $self->{'column_names'} = \@column_names;
+    }
+
+    return @{$self->{'column_names'}};
+} 
+
+sub set_column_names {
+    my $self = shift;
+    return unless(@_);
+
+    $self->{column_names} = shift;
+}
+
 
 1;

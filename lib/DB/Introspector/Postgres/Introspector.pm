@@ -8,6 +8,7 @@ use base qw( DB::Introspector::CommonRDB::Introspector );
 use constant SINGLE_TABLE_QUERY => 
 'SELECT LOWER(relname) AS %s, relowner AS %s FROM pg_class 
  WHERE LOWER(relname)=?';
+
 use constant ALL_TABLES_QUERY => 
 q(SELECT LOWER(relname) AS %s, relowner AS %s FROM pg_class 
   WHERE relowner>1 AND relkind='r');
@@ -96,6 +97,16 @@ use constant PRIMARY_KEYS_QUERY =>
                             pg_type c 
  WHERE i.indisprimary and i.indrelid=c.typrelid and LOWER(c.typname)=?'; 
 
+use constant INDEX_LOOKUP_QUERY =>
+q(select i.relname AS name,        
+         ind.indkey AS column_ids,
+         ind.indisunique AS unique 
+  FROM pg_class t, 
+       pg_class i, 
+       pg_index ind 
+  WHERE ind.indexrelid=i.oid   
+    AND ind.indrelid=t.oid
+    AND t.relname=?);
 
 
 use constant COLUMN_ARG_DELIM => '\0';
@@ -118,6 +129,16 @@ sub get_column_lookup_statement {
     my $self = shift;
 
     my $sth = $self->_introspector->dbh->prepare_cached(COLUMN_QUERY);
+
+    $sth->execute(lc($self->name));
+
+    return $sth;
+}
+
+sub get_indexes_lookup_statement {
+    my $self = shift;
+
+    my $sth = $self->_introspector->dbh->prepare_cached(INDEX_LOOKUP_QUERY);
 
     $sth->execute(lc($self->name));
 
@@ -207,6 +228,8 @@ sub get_column_instance {
 
 sub get_foreign_key_class { return 'DB::Introspector::Postgres::ForeignKey'; }
 
+sub get_index_class { return 'DB::Introspector::Postgres::Index'; }
+
 
 
 package DB::Introspector::Postgres::ForeignKey;
@@ -270,6 +293,43 @@ sub _parse_foreign_key_data {
     }
     $self->set_local_column_names(\@local_column_names);
     $self->set_foreign_column_names(\@foreign_column_names);
+}
+
+
+package DB::Introspector::Postgres::Index;
+
+use strict;
+
+use base qw( DB::Introspector::CommonRDB::Index );
+
+use constant COLUMN_ARG_DELIM => ' ';
+
+sub new {
+    my $class = shift;
+    my $table = shift;
+    my %row = @_;
+    my $self = $class->SUPER::new($table, $row{UNIQUE});
+    $self->{_name} = $row{NAME} || "";
+    $self->set_column_names([$self->_resolve_column_names($row{COLUMN_IDS})]);
+    $self;
+}
+
+sub name {
+    my $self = shift;
+    return $self->{_name};
+}
+
+sub _resolve_column_names {
+    my $self = shift;
+    my $column_ids = shift;
+    my @ids = split(COLUMN_ARG_DELIM, $column_ids);
+    my @columns = $self->table->columns;
+    return map { $columns[$_-1]->name; } @ids;
+}
+
+sub column_names {
+    my $self = shift;
+    return @{$self->{column_names}};
 }
 
 1;

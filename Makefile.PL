@@ -2,7 +2,7 @@ use strict;
 
 use ExtUtils::MakeMaker;
 
-my $VERSION = q(0.03);
+my $VERSION = q(0.04);
 
 
 WriteMakefile(
@@ -14,6 +14,7 @@ WriteMakefile(
         'Getopt::Long'       => 1.00,
         'IO::File'           => 1.00,
         'DBI'                => 1.00,
-        'Test::Unit'         => 0
+        'Test::Unit'         => 0,
+        'Test::Unit::TestRunner' => 0
       },
 );

@@ -1,3 +1,10 @@
+Version .04
+* Implemented support for Indexes
+* Fixed find_table bug (exploited when find_all_tables was called before find_table)
+* Added more helpful comments in POD
+* Added Test::Unit::TestRunner as a dependency of this project
+
+Version .03
 * Implemented MySQL support (Alpha)
 * Handling type attributes (length, not null, etc)
 * Refactored a bit out of CommonRDB and placed into Introspector.pm

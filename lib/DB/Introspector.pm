@@ -27,14 +27,13 @@ sub lookup_all_tables {
 sub find_all_tables {
     my $self = shift;
 
-    if( $self->_looked_up_all_tables ) {
-        return $self->_get_all_cached_tables;
-    } else {
+    unless( $self->_looked_up_all_tables ) {
         foreach my $table ($self->lookup_all_tables) {
             $self->_cache_table($table);
         }
         $self->_looked_up_all_tables(1);
     }
+    return $self->_get_all_cached_tables;
 }
 
 sub _get_all_cached_tables {
@@ -178,7 +177,13 @@ DB::Introspector
  my $table = $introspector->find_table('foo');
  
  print $table->name;
- 
+
+ # showing the table's indexes
+ foreach my $index ($table->indexes) {
+     print $index->name.": (".join(",",$index->column_names).")\n";
+ }
+
+ # showing the table's foreign keys
  foreach my $foreign_key ($table->foreign_keys) {
 
      print $foreign_key->foreign_table->name;
@@ -186,8 +191,16 @@ DB::Introspector
      print join(",",$foreign_key->foreign_column_names);
 
  }
+
+ # showing foreign keys that reference this table ('foo')
+ foreach my $foreign_key ($table->dependencies) {
+     print "Some other table :".$foreign_key->local_table->name
+          ." is pointing to me\n";
+ }
  
  my @tables = $introspector->find_tables;
+
+ # you can do other cool stuff; just read the docs.
 
 =head1 DESCRIPTION
 

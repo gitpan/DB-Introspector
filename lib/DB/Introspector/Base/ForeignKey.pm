@@ -2,6 +2,8 @@ package DB::Introspector::Base::ForeignKey;
 
 use strict;
 
+sub name { return ""; }
+
 sub foreign_table {
     my $self = shift;
     die("foreign_table not defined for ".ref($self));

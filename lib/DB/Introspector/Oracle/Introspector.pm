@@ -60,6 +60,11 @@ q(SELECT constraint_name AS name FROM user_constraints
     AND LOWER(table_name)=?
     AND owner=r_owner);
 
+use constant INDEXES_LOOKUP_QUERY =>
+q(SELECT index_name AS name, uniqueness 
+  FROM user_indexes
+  WHERE LOWER(table_name)=?);
+
 use constant DEPENDENCIES_LOOKUP_QUERY =>
 q(SELECT dep.constraint_name AS name, dep.table_name AS child_table_name
   FROM  user_constraints dep, 
@@ -138,6 +143,15 @@ sub get_foreign_keys_lookup_statement {
     return $sth;
 }
 
+sub get_indexes_lookup_statement {
+    my $self = shift;
+
+    my $sth = $self->_introspector->dbh->prepare_cached(INDEXES_LOOKUP_QUERY);
+
+    $sth->execute(lc($self->name));
+    return $sth;
+}
+
 sub get_dependencies_lookup_statement {
     my $self = shift;
 
@@ -162,7 +176,11 @@ sub get_column_instance {
         # length is dependent on the number of acceptable characters in the
         # number
         my $max = '9' x $extra_data->{LENGTH};
-        return $class->new($name, -$max, $max);
+        if( defined $max ) {
+            return $class->new($name, -$max, $max);
+        } else {
+            return $class->new($name);
+        }
     } elsif ($class->isa('DB::Introspector::Base::StringColumn')) {
         return $class->new($name, 0, $extra_data->{LENGTH});
     } else {
@@ -174,7 +192,9 @@ sub get_foreign_key_class {
     return q(DB::Introspector::Oracle::ForeignKey);
 }
 
-
+sub get_index_class {
+    return q(DB::Introspector::Oracle::Index);
+}
 
 package DB::Introspector::Oracle::ForeignKey;
 
@@ -239,5 +259,41 @@ sub get_foreign_table_name_lookup_statement {
     $sth->execute($self->name);
     return $sth;
 }
+
+package DB::Introspector::Oracle::Index;
+
+use strict;
+
+use base qw( DB::Introspector::CommonRDB::Index );
+use constant UNIQUE => 'UNIQUE';
+
+use constant COLUMN_NAME_LOOKUP_QUERY => 
+q(SELECT LOWER(column_name) AS name FROM user_ind_columns WHERE index_name=? 
+  ORDER BY column_position ASC); 
+
+sub new {
+    my $class = shift;
+    my $table = shift;
+    my %row = @_;
+
+    my $self = $class->SUPER::new($table, $row{UNIQUENESS} eq UNIQUE());
+    $self->{_name} = $row{NAME};
+
+    $self;
+}
+
+sub name {
+    my $self = shift;
+    return $self->{_name};
+}
+
+sub get_column_name_lookup_statement {
+    my $self = shift;
+    my $sth = $self->table->_introspector->dbh->prepare_cached(
+        COLUMN_NAME_LOOKUP_QUERY);
+    $sth->execute($self->name);
+    return $sth;
+}
+
 
 1;

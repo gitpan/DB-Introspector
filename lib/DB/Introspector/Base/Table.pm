@@ -22,6 +22,11 @@ sub owner {
     return $self->{_owner};
 }
 
+sub indexes {
+    my $self = shift;
+    die("indexes is not defined for ".(ref($self))); 
+}
+
 sub columns {
     my $self = shift;
     die("columns is not defined for ".(ref($self))); 
