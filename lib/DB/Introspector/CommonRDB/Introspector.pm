@@ -93,6 +93,11 @@ sub get_dependencies_lookup_statement {
     die("get_dependencies_lookup_statement not defined");
 }
 
+sub get_functional_index_class {
+    my $self = shift;
+    return $self->get_index_class(@_);
+}
+
 sub get_column_instance {
     my $self = shift;
     my $name = shift;
@@ -216,14 +221,18 @@ sub _lookup_foreign_keys {
     return \@foreign_keys;
 }
 
+use constant FUNCTIONAL => 'FUNCTIONAL';
 sub _lookup_indexes {
     my $self = shift;
     my $sth = $self->get_indexes_lookup_statement();
 
     my @indexes;
     while( my $row = $sth->fetchrow_hashref('NAME_uc') ) {
-        my $index = $self->get_index_class()->new($self, %$row);
-        push(@indexes, $index);
+        if(defined($row->{INDEX_TYPE}) && $row->{INDEX_TYPE} eq FUNCTIONAL()) {
+          push(@indexes,$self->get_functional_index_class()->new($self, %$row));
+        } else {
+          push(@indexes, $self->get_index_class()->new($self, %$row));
+        }
     }
     $sth->finish();
 

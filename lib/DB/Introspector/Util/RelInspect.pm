@@ -55,7 +55,7 @@ sub find_paths_between_two_tables {
 
     $path ||= new DB::Introspector::ForeignKeyPath;
 
-    return if( $visited->{$table_a->name} );
+    return $path_list if( $visited->{$table_a->name} );
     local $visited->{$table_a->name} = 1;
 
     foreach my $foreign_key ( $table_a->foreign_keys ) {

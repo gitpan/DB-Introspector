@@ -7,10 +7,16 @@ use base q(DB::Introspector::Base::Column);
 sub new {
     my $class = shift;
     my $name = shift;
+    my $real_type = shift;
 
     my $self = $class->SUPER::new($name);
-
+    $self->{_real_type} = $real_type;
     return $self;
+}
+
+sub real_type {
+    my $self = shift;
+    return $self->{_real_type};
 }
 
 1;

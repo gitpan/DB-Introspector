@@ -2,7 +2,7 @@ package DB::Introspector;
 
 use strict;
 
-$DB::Introspector::VERSION = '0.07';
+$DB::Introspector::VERSION = '0.08';
 
 use DBI;
 use Config::Properties;

@@ -1,7 +1,7 @@
 List of things TODO:
 
 * Variable Schemas
-* Functional Indexes
+/ Functional Indexes
 * Sequences
 * Synonyms
 - Child reference support on DB::Introspector::Base::Table.

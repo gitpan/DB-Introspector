@@ -66,8 +66,11 @@ q(SELECT constraint_name AS name,
     AND owner=r_owner);
 
 use constant INDEXES_LOOKUP_QUERY =>
-q(SELECT index_name AS name, uniqueness 
-  FROM user_indexes
+q(SELECT index_name AS name, 
+         uniqueness, 
+         DECODE(index_type, 'FUNCTION-BASED NORMAL', 'FUNCTIONAL', 
+                index_type) AS index_type
+  FROM user_indexes 
   WHERE LOWER(table_name)=?);
 
 use constant DEPENDENCIES_LOOKUP_QUERY =>
@@ -205,6 +208,10 @@ sub get_index_class {
     return q(DB::Introspector::Oracle::Index);
 }
 
+sub get_functional_index_class {
+    return q(DB::Introspector::Oracle::FunctionalIndex);
+}
+
 package DB::Introspector::Oracle::ForeignKey;
 
 use strict;
@@ -316,5 +323,69 @@ sub get_column_name_lookup_statement {
     return $sth;
 }
 
+
+package DB::Introspector::Oracle::FunctionalIndex;
+
+use strict;
+
+use base qw( DB::Introspector::Oracle::Index );
+use constant UNIQUE => 'UNIQUE';
+
+use constant COLUMN_NAME_LOOKUP_QUERY => 
+q( SELECT co.column_name AS name, 
+          co.column_position AS central_position, 
+          ex.column_position AS expression_position, 
+          ex.column_expression AS expression
+   FROM user_ind_expressions ex, user_ind_columns co
+   WHERE ex.index_name = co.index_name
+   AND ex.index_name = ? 
+   ORDER BY co.column_position ASC 
+); 
+
+sub new {
+    my $class = shift;
+    my $self = $class->SUPER::new(@_);
+
+    $self->{_is_expression} = {};
+    $self;
+}
+
+sub get_column_name_lookup_statement {
+    my $self = shift;
+    my $sth = $self->table->_introspector->dbh->prepare_cached(
+        COLUMN_NAME_LOOKUP_QUERY);
+    $sth->execute($self->name);
+    return $sth;
+}
+
+sub column_names {
+    my $self = shift;
+                                                                                
+    unless( defined $self->{'column_names'} ) {
+        my $sth = $self->get_column_name_lookup_statement();
+                                                                                
+        my @column_names;
+        while( my $row = $sth->fetchrow_hashref('NAME_uc') ) {
+            # this means we have an expression
+            if( $row->{CENTRAL_POSITION} eq $row->{EXPRESSION_POSITION} ) {
+                push(@column_names, $row->{EXPRESSION});
+                $self->{_is_expression}{$row->{EXPRESSION}} = 1;
+            } else {
+                push(@column_names, $row->{NAME});
+            }
+        }
+        $sth->finish();
+                                                                                
+        $self->{'column_names'} = \@column_names;
+    }
+                                                                                
+    return @{$self->{'column_names'}};
+}
+
+sub is_expression { 
+    my $self = shift;
+    my $column_name = shift;
+    $self->{_is_expression}{$column_name};
+}
 
 1;

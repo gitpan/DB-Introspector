@@ -313,9 +313,10 @@ sub _fetch_columns {
         my ($type, $attr) = ($row->{type} =~ /(\w+)\((\d+)\)/);
         $type = lc($type);
         my $callback = COLUMN_CALLBACKS()->{$type};
-        die("undefined callback for type:$type") unless( defined $callback );
-        my $column = DB::Introspector::MySQL::ColumnFactory
-                     ->$callback($row->{field},$type, $row->{null}, $attr);
+        my $column = (defined $callback) 
+            ? DB::Introspector::MySQL::ColumnFactory
+              ->$callback($row->{field},$type, $row->{null}, $attr)
+            : DB::Introspector::Base::SpecialColumn->new($row->{field}, $type); 
         push(@{$self->{columns}}, $column);
         push(@{$self->{primary_key}}, $column) if($row->{key} eq 'PRI');
     }
@@ -328,7 +329,7 @@ sub _fetch_indexes {
     my $self = shift;
 
     my $sth = $self->introspector->dbh->prepare_cached(
-                'SHOW INDEXES FROM '.$self->name);
+                'SHOW INDEX FROM '.$self->name);
     $sth->execute();
 
     my %indexes;
