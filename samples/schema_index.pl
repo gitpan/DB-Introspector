@@ -142,7 +142,10 @@ foreach my $table (@ordered_tables) {
         print (INDENT() x $indent);
         my $column_type = ref($column);
         $column_type =~ s/.*:://g;
-        print $column->name.":\t $column_type\n";
+        print $column->name.":\t $column_type";
+        print '('.$column->real_type.')' 
+           if(UNIVERSAL::isa($column, 'DB::Introspector::Base::SpecialColumn'));
+        print "\n";
     }
     $indent--;
 

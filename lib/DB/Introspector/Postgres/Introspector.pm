@@ -65,6 +65,7 @@ use DB::Introspector::Base::CLOBColumn;
 
 use constant COLUMN_CLASS_MAPPING => {
     'bool' => 'DB::Introspector::Base::BooleanColumn',
+    'int2' => 'DB::Introspector::Base::IntegerColumn',
     'int4' => 'DB::Introspector::Base::IntegerColumn',
     'int8' => 'DB::Introspector::Base::IntegerColumn',
     'bpchar' => 'DB::Introspector::Base::CharColumn',
@@ -85,12 +86,13 @@ use constant COLUMN_QUERY =>
     ORDER BY a.attnum';
 
 use constant FOREIGN_KEYS_QUERY => 
-'SELECT tr.tgname AS NAME, tr.tgnargs AS LENGTH, tr.tgargs AS ARGUMENTS 
+'SELECT tr.tgnargs AS LENGTH, tr.tgargs AS ARGUMENTS 
  FROM pg_trigger tr, pg_type t 
  WHERE tr.tgisconstraint 
     AND tr.tgenabled 
     AND tr.tgrelid=t.typrelid 
-    AND LOWER(t.typname)=?';
+    AND tr.tgargs like ? 
+    GROUP BY tr.tgnargs, tr.tgargs';
 
 use constant PRIMARY_KEYS_QUERY =>
 'SELECT indkey AS IDS FROM  pg_index i, 
@@ -150,7 +152,7 @@ sub get_foreign_keys_lookup_statement {
 
     my $sth = $self->_introspector->dbh->prepare_cached(FOREIGN_KEYS_QUERY);
 
-    $sth->execute($self->name);
+    $sth->execute('%\000'.$self->name.'\000%');
 
     return $sth;
 }
@@ -221,8 +223,7 @@ sub get_column_instance {
     my $name = shift;
     my $type_name = lc(shift);
 
-    my $class = COLUMN_CLASS_MAPPING()->{$type_name}
-                            || die("class not found for type:$type_name");
+    my $class = COLUMN_CLASS_MAPPING()->{$type_name} || return;
     return $class->new($name);
 }
 

@@ -84,10 +84,11 @@ q(SELECT dep.constraint_name AS name,
     AND LOWER(ent.table_name) = ?);
 
 use constant PRIMARY_KEY_LOOKUP_QUERY =>
-q(SELECT LOWER ( column_name )
-    FROM user_cons_columns JOIN user_constraints c
-         USING (constraint_name)
-    WHERE constraint_type='P'
+q(SELECT LOWER ( cols.column_name )
+    FROM user_cons_columns cols,
+         user_constraints c
+    WHERE cols.constraint_name=c.constraint_name
+      AND constraint_type='P'
       AND LOWER(c.table_name)=?
     ORDER BY position);
 
@@ -108,8 +109,6 @@ use constant COLUMN_CLASS_MAPPING => {
     'DATE' => 'DB::Introspector::Base::DateTimeColumn',
     'TIMESTAMP(6)' => 'DB::Introspector::Base::DateTimeColumn',
     'CLOB' => 'DB::Introspector::Base::CLOBColumn',
-    'ROWID' => 'DB::Introspector::Base::SpecialColumn',
-    'UROWID' => 'DB::Introspector::Base::SpecialColumn',
 };
 
 sub get_primary_key_column_ids {
@@ -179,8 +178,7 @@ sub get_column_instance {
     my $type_name = uc(shift);
     my $extra_data = shift;
 
-    my $class = COLUMN_CLASS_MAPPING()->{$type_name}
-                            || die("class not found for type:$type_name");
+    my $class = COLUMN_CLASS_MAPPING()->{$type_name} || return;
 
     if($class->isa('DB::Introspector::Base::IntegerColumn')) {
         # if we are dealing with an Integer then assume that our min and max

@@ -67,9 +67,10 @@ sub get_table_instance {
 
 package DB::Introspector::CommonRDB::Table;
 
+use base qw( DB::Introspector::Base::Table );
+
 use strict;
 
-use base qw( DB::Introspector::Base::Table );
 
 use constant COLUMN_NAME_COL => 'COLUMN_NAME';
 
@@ -147,6 +148,7 @@ sub _introspector {
     return $self->{_introspector};
 }
 
+use DB::Introspector::Base::SpecialColumn;
 sub columns {
     my $self = shift;
 
@@ -156,8 +158,11 @@ sub columns {
         my @columns;
         while( my $row = $sth->fetchrow_hashref('NAME_uc') ) {
             my $column = $self->get_column_instance(
-                $row->{NAME}, $row->{TYPE}, $row);
-                push(@columns, $column);
+                $row->{NAME}, $row->{TYPE}, $row) 
+            || DB::Introspector::Base::SpecialColumn
+               ->new($row->{NAME}, $row->{TYPE});
+            
+            push(@columns, $column);
         }
         $sth->finish();
 

@@ -1,5 +1,7 @@
 package DB::Introspector::Base::Column;
 
+use base qw( DB::Introspector::Base::Object );
+
 use strict;
 
 

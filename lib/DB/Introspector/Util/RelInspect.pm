@@ -24,13 +24,13 @@ sub find_mapped_paths_between_tables {
         return [];
     }
 
-    foreach my $foreign_key ($child_table->foreign_keys) {
+    foreach my $foreign_key ($root_table->dependencies) {
         next if($foreign_key->local_table->name 
              eq $foreign_key->foreign_table->name);
         my $internal_path = $path->clone();
-        $internal_path->prepend_foreign_key($foreign_key);
-        $class->find_mapped_paths_between_tables( $root_table,
-                                           $foreign_key->foreign_table, 
+        $internal_path->append_foreign_key($foreign_key);
+        $class->find_mapped_paths_between_tables( $foreign_key->local_table,
+                                           $child_table, 
                                            $internal_path, 
                                            $path_list );
     }
@@ -42,42 +42,47 @@ sub find_paths_between_two_tables {
     my $class = shift;
     my $table_a = shift;
     my $table_b = shift;
+    my $stop_at_first_contact = shift;
+
     my $visited = shift || {};
-    my $path = shift || new DB::Introspector::ForeignKeyPath;
+    my $path = shift;
     my $path_list = shift || [];
 
-    if( $table_a->name eq $table_b->name ) {
-        unshift(@$path_list, $path); 
-        return;
- 
-   }
+    if( $table_a->name eq $table_b->name && defined($path)) {
+        push(@$path_list, $path); 
+        return $path_list if($stop_at_first_contact);
+    }
 
-    return if( $visited->{$table_b->name} );
-    local $visited->{$table_b->name} = 1;
+    $path ||= new DB::Introspector::ForeignKeyPath;
 
+    return if( $visited->{$table_a->name} );
+    local $visited->{$table_a->name} = 1;
 
-    foreach my $foreign_key (   $table_b->foreign_keys ) {
+    foreach my $foreign_key ( $table_a->foreign_keys ) {
         my $internal_path = $path->clone();
-        $internal_path->prepend_foreign_key($foreign_key);
-        $class->find_paths_between_two_tables( $table_a,
-                                           $foreign_key->foreign_table,
+        $internal_path->append_foreign_key($foreign_key);
+        $class->find_paths_between_two_tables( $foreign_key->foreign_table,
+                                           $table_b,
+                                           $stop_at_first_contact,
                                            $visited, 
                                            $internal_path,
                                            $path_list ); 
     }
 
 
-    foreach my $foreign_key (   $table_b->dependencies ) {
+    foreach my $foreign_key ( $table_a->dependencies ) {
         my $internal_path = $path->clone();
-        $internal_path->prepend_foreign_key($foreign_key);
-        $class->find_paths_between_two_tables( $table_a,
-                                           $foreign_key->local_table,
+        $internal_path->append_foreign_key($foreign_key);
+        $class->find_paths_between_two_tables( $foreign_key->local_table,
+                                           $table_b,
+                                           $stop_at_first_contact, 
                                            $visited, 
                                            $internal_path,
                                            $path_list ); 
     }
 
-    return $path_list;
+
+   return $path_list;
 }
 
 
@@ -105,6 +110,30 @@ that deal with relationship traversal.
 =over 4
 
 
+=item find_paths_between_tables($table_1, $table_2, $option_stop_at_first_contact)
+
+=over 4
+
+Params:
+
+=over 4
+
+$table_1 - the first element of each path DB::Introspector::Base::Table
+
+$table_2 - the last element of each path DB::Introspector::Base::Table
+
+$option_stop_at_first_contact (1|0) - stop once the destination table
+($table_2) has been encountered, rather than continuing to find paths from the
+destination back to the destination
+
+=back
+
+Returns: (\@) of DB::Introspector::ForeignKeyPath instances.
+All paths between $parent_table and $child_table.
+
+=back
+
+
 
 =item find_mapped_paths_between_tables($parent_table, $child_table)
 
@@ -120,7 +149,8 @@ $child_table - the last element of each path
 
 =back
 
-Returns: All paths between $parent_table and $child_table where $child_table
+Returns: (\@) of DB::Introspector::MappedPath instances.
+All paths between $parent_table and $child_table where $child_table
 depends on $parent_table, even indirectly.
 
 =back

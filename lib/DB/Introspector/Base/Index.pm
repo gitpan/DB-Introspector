@@ -1,5 +1,7 @@
 package DB::Introspector::Base::Index;
 
+use base qw( DB::Introspector::Base::Object );
+
 use strict;
 
 sub column_names {
@@ -18,8 +20,6 @@ sub new {
 
     return $self;
 }
-
-sub name { return ""; }
 
 sub unique {
     my $self = shift;

@@ -1,7 +1,12 @@
 List of things TODO:
 
-* Child reference support on DB::Introspector::Base::Table.
+* Variable Schemas
+* Functional Indexes
+* Sequences
+* Synonyms
+- Child reference support on DB::Introspector::Base::Table.
 * Check constraint support on DB::Introspector::Base::Column.
 * Column type simulation plugins (eg Oracle boolean introspection)
 * Candidate keys in Table
-* Index detection
+- Index detection
+* Execution Plans

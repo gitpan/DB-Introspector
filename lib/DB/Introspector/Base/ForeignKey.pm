@@ -1,5 +1,7 @@
 package DB::Introspector::Base::ForeignKey;
 
+use base qw( DB::Introspector::Base::Object );
+
 use strict;
 
 use constant DELETE_RULE_NO_ACTION => 'NO ACTION';
@@ -8,6 +10,54 @@ use constant DELETE_RULE_SET_NULL => 'SET NULL';
 use constant DELETE_RULE_SET_DEFAULT => 'SET DEFAULT';
 
 sub name { return ""; }
+
+sub local_for_foreign_column {
+    my $self = shift;
+    my $foreign_column_name = shift;
+
+    my $index = $self->foreign_column_index($foreign_column_name);
+    return undef unless defined($index);
+
+    my @local_columns = $self->local_column_names;
+    return $local_columns[$index];
+}
+
+sub foreign_for_local_column {
+    my $self = shift;
+    my $local_column_name = shift;
+
+    my $index = $self->local_column_index($local_column_name);
+    return undef unless defined($index);
+
+    my @foreign_columns = $self->foreign_column_names;
+    return $foreign_columns[$index];
+}
+
+sub local_column_index {
+    my $self = shift; 
+    my $local_column_name = shift;
+
+    my @local_columns = $self->local_column_names;
+
+    foreach my $index (0..$#local_columns) {
+        return $index if($local_columns[$index] eq $local_column_name);
+    }
+
+    return undef;
+}
+
+sub foreign_column_index {
+    my $self = shift; 
+    my $foreign_column_name = shift;
+
+    my @foreign_columns = $self->foreign_column_names;
+
+    foreach my $index (0..$#foreign_columns) {
+        return $index if($foreign_columns[$index] eq $foreign_column_name);
+    }
+
+    return undef;
+}
 
 sub foreign_table {
     my $self = shift;

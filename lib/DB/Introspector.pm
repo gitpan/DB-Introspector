@@ -2,7 +2,7 @@ package DB::Introspector;
 
 use strict;
 
-$DB::Introspector::VERSION = '0.06';
+$DB::Introspector::VERSION = '0.07';
 
 use DBI;
 use Config::Properties;
@@ -13,8 +13,6 @@ use constant DRIVER_PROPERTIES_FILE => 'driver.properties';
 use vars qw( %REGISTRY %INC );
 
 DB::Introspector->register_drivers();
-
-
 
 sub lookup_table {
     my $self = shift;

@@ -1,7 +1,8 @@
 package DB::Introspector::Base::Table;
 
-use strict;
+use base qw( DB::Introspector::Base::Object );
 
+use strict;
 
 sub new {
     my $class = shift;
