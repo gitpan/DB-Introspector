@@ -1,0 +1,241 @@
+package DB::Introspector::Postgres::Introspector;
+
+
+use strict;
+
+use base qw( DB::Introspector::CommonRDB::Introspector );
+
+use constant SINGLE_TABLE_QUERY => 
+'SELECT LOWER(relname) AS %s, relowner AS %s FROM pg_class 
+ WHERE LOWER(relname)=?';
+use constant ALL_TABLES_QUERY => 
+q(SELECT LOWER(relname) AS %s, relowner AS %s FROM pg_class 
+  WHERE relowner>1 AND relkind='r');
+
+sub get_single_table_lookup_statement {
+    my $self = shift;
+    my $table_name = lc(shift);
+
+    my $query = sprintf(SINGLE_TABLE_QUERY, 
+                   &DB::Introspector::CommonRDB::Introspector::TABLE_NAME_COL,
+                   &DB::Introspector::CommonRDB::Introspector::OWNER_NAME_COL);
+    my $sth = $self->dbh->prepare_cached($query);
+    $sth->execute($table_name);
+    return $sth;
+}
+
+
+sub _cached_table {
+    my $self = shift;
+    my $table_name = lc(shift);
+    $self->SUPER::_cached_table($table_name);
+}
+
+sub get_all_tables_lookup_statement {
+    my $self = shift;
+
+    my $query = sprintf(ALL_TABLES_QUERY, 
+                   &DB::Introspector::CommonRDB::Introspector::TABLE_NAME_COL,
+                   &DB::Introspector::CommonRDB::Introspector::OWNER_NAME_COL);
+    my $sth = $self->dbh->prepare_cached($query);
+    $sth->execute();
+    return $sth;
+}
+
+sub get_table_class {
+    return q(DB::Introspector::Postgres::Table);
+}
+
+
+
+package DB::Introspector::Postgres::Table;
+
+use strict;
+
+use base qw( DB::Introspector::CommonRDB::Table );
+
+
+use DB::Introspector::Base::BooleanColumn;
+use DB::Introspector::Base::IntegerColumn;
+use DB::Introspector::Base::CharColumn;
+use DB::Introspector::Base::StringColumn;
+use DB::Introspector::Base::DateTimeColumn;
+use DB::Introspector::Base::CLOBColumn;
+
+use constant COLUMN_CLASS_MAPPING => {
+    'bool' => 'DB::Introspector::Base::BooleanColumn',
+    'int8' => 'DB::Introspector::Base::IntegerColumn',
+    'bpchar' => 'DB::Introspector::Base::CharColumn',
+    'varchar' => 'DB::Introspector::Base::StringColumn',
+    'timestamptz' => 'DB::Introspector::Base::DateTimeColumn',
+    'timestamp' => 'DB::Introspector::Base::DateTimeColumn',
+    'text' => 'DB::Introspector::Base::CLOBColumn',
+};
+
+
+
+use constant COLUMN_QUERY =>
+'SELECT LOWER(a.attname) AS NAME, t.typname AS TYPE 
+    FROM pg_attribute a, pg_type t, pg_type r
+    WHERE a.attrelid=r.typrelid 
+        AND t.oid=a.atttypid
+        AND a.attnum > 0 AND LOWER(r.typname)=?
+    ORDER BY a.attnum';
+
+use constant FOREIGN_KEYS_QUERY => 
+'SELECT tr.tgname AS NAME, tr.tgnargs AS LENGTH, tr.tgargs AS ARGUMENTS 
+ FROM pg_trigger tr, pg_type t 
+ WHERE tr.tgisconstraint 
+    AND tr.tgenabled 
+    AND tr.tgrelid=t.typrelid 
+    AND LOWER(t.typname)=?';
+
+use constant PRIMARY_KEYS_QUERY =>
+'SELECT indkey AS IDS FROM  pg_index i, 
+                            pg_type c 
+ WHERE i.indisprimary and i.indrelid=c.typrelid and LOWER(c.typname)=?'; 
+
+
+
+use constant COLUMN_ARG_DELIM => '\0';
+
+sub get_primary_key_column_ids {
+    my $self = shift;
+
+    unless( $self->{_primary_key_column_ids} ) {
+        my $sth = $self->_introspector->dbh->prepare_cached(PRIMARY_KEYS_QUERY);
+        $sth->execute(lc($self->name));
+        my $fetched_row = $sth->fetchrow_hashref('NAME_lc');
+        $sth->finish();
+        my @ids = map { $_-1; } split(/\s+/, $fetched_row->{ids});
+        $self->{_primary_key_column_ids} = \@ids;
+    }
+    return @{$self->{_primary_key_column_ids}};
+} 
+
+sub get_column_lookup_statement {
+    my $self = shift;
+
+    my $sth = $self->_introspector->dbh->prepare_cached(COLUMN_QUERY);
+
+    $sth->execute(lc($self->name));
+
+    return $sth;
+}
+
+sub get_foreign_keys_lookup_statement {
+    my $self = shift;
+
+    my $sth = $self->_introspector->dbh->prepare_cached(FOREIGN_KEYS_QUERY);
+
+    $sth->execute($self->name);
+
+    return $sth;
+}
+
+
+sub _lookup_foreign_keys {
+    my $self = shift;
+
+    my $sth = $self->get_foreign_keys_lookup_statement();
+
+    my @foreign_keys;
+
+    # I think the only way for us to know if we have a foreign key (as opposed
+    # to another table referencing us) is to parse the arguments of the trigger
+    # implementation and make sure that the 2nd element is equal to our table
+    # name.  With the new dictionary tables (like pg_constraints) in Postgres
+    # 7.3, I don't think we will have to do this.
+    while( my $row = $sth->fetchrow_hashref('NAME_uc') ) {
+        my @column_args = split(COLUMN_ARG_DELIM, $row->{'ARGUMENTS'});
+        if( lc($column_args[1]) ne lc($self->name) ) {
+            next;
+        }
+
+        my $foreign_key = $self->get_foreign_key_class()->new($self, %$row);
+        push(@foreign_keys, $foreign_key);
+    }
+
+    $sth->finish();
+
+    return \@foreign_keys;
+}
+
+sub get_column_instance {
+    my $self = shift;
+    my $name = shift;
+    my $type_name = lc(shift);
+
+    my $class = COLUMN_CLASS_MAPPING()->{$type_name}
+                            || die("class not found for type:$type_name");
+    return $class->new($name);
+}
+
+sub get_foreign_key_class { return 'DB::Introspector::Postgres::ForeignKey'; }
+
+
+
+package DB::Introspector::Postgres::ForeignKey;
+
+use strict;
+
+use base qw( DB::Introspector::CommonRDB::ForeignKey );
+
+sub new {
+    my $class = shift;
+    my $self = $class->SUPER::new(shift());
+
+    my %args = @_;
+
+    $self->_parse_foreign_key_data($args{LENGTH}, $args{ARGUMENTS});
+    return $self;
+}
+
+
+# Parsing a string like the following:
+#<unnamed>\000news_articles\000users\000UNSPECIFIED\000created_by\000user_id\000
+sub _parse_foreign_key_data {
+    my $self = shift;
+
+    # subtracting 4 from our arg length to get the number of column name args
+    # we have
+    my $length = shift() - 4;
+    my $arg_string = shift;
+
+    # parse the trigger arguments
+    my @data = split(DB::Introspector::Postgres::Table::COLUMN_ARG_DELIM, 
+                    $arg_string);
+
+    # the very first string is useless to us
+    shift(@data); 
+
+    # the first two arguments are table names.
+    my $local_table_name = shift(@data);
+    my $foreign_table_name = shift(@data);
+
+    # if our local table name doesn't match our local table's name then 
+    # we have a problem.
+    unless( lc($local_table_name) eq lc($self->local_table->name) ) {
+        die("INVALID FOREIGN KEY: local table $local_table_name "
+        ."doesn't match local table ".$self->local_table->name);
+    }
+
+    # setting the foreign table name
+    $self->set_foreign_table_name($foreign_table_name);
+
+    # the fourth argument is useless to us so we will toss it.
+    shift(@data);
+
+    # since each argument is grouped in pairs, we will walk through and pull
+    # out two at a time, the first for the local table and the second for the 
+    # remote table. 
+    my (@local_column_names, @foreign_column_names);
+    while( @data ) {
+        push(@local_column_names, shift(@data));
+        push(@foreign_column_names, shift(@data));
+    }
+    $self->set_local_column_names(\@local_column_names);
+    $self->set_foreign_column_names(\@foreign_column_names);
+}
+
+1;

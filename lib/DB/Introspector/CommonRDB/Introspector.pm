@@ -1,0 +1,325 @@
+package DB::Introspector::CommonRDB::Introspector;
+
+use strict;
+
+use base qw( DB::Introspector );
+
+use constant TABLE_NAME_COL => 'TABLE_NAME';
+use constant OWNER_NAME_COL => 'OWNER_NAME';
+
+
+## ABSTRACT METHODS
+
+sub get_single_table_lookup_statement {
+    die("get_table_lookup_statement not defined");
+}
+
+sub get_all_tables_lookup_statement {
+    die("get_all_tables_lookup_statement not defined");
+}
+
+sub get_table_class {
+    die("get_table_class not defined");
+}
+
+
+## DEFINED METHODS
+
+sub new {
+    my $class = shift;
+    my $self = $class->SUPER::new(@_);
+
+    $self->{_table_cache} = {};
+    $self;
+}
+
+sub find_table {
+    my $self = shift;
+    my $table_name = shift;
+
+    unless(defined $self->_cached_table($table_name)) {
+        my $sth = $self->get_single_table_lookup_statement($table_name);
+        my $row = $sth->fetchrow_hashref('NAME_uc');
+        $sth->finish();
+        return unless( defined $row );
+        
+        if (defined $row) { 
+            $self->_cache_table(
+                $self->get_table_instance($row->{TABLE_NAME_COL()}, 
+                                          $row->{OWNER_NAME_COL}));
+        }
+    }
+    return $self->_cached_table($table_name);
+}
+
+sub find_all_tables {
+    my $self = shift;
+    my $table_name = shift;
+
+    my $sth = $self->get_all_tables_lookup_statement();
+
+# TODO: use cache
+    my @results; 
+    while( my $row = $sth->fetchrow_hashref('NAME_uc') ) {
+        my $table = $self->get_table_instance($row->{TABLE_NAME_COL()},
+                                              $row->{OWNER_NAME_COL});
+        push(@results, $table);
+    }
+    $sth->finish();
+
+    return @results; 
+}
+
+sub get_table_instance {
+    my $self = shift;
+    my $table_name = shift;
+    my $owner_name = shift;
+
+    return $self->get_table_class->new($table_name, $owner_name, $self);
+}
+
+sub _cached_table {
+    my $self = shift;
+    my $table_name = shift;
+    return $self->{_table_cache}{$table_name};
+}
+
+sub _cache_table {
+    my $self = shift;
+
+    if(@_) {
+        my $table = shift;
+        $self->{_table_cache}{$table->name} = $table;
+    }
+}
+
+
+package DB::Introspector::CommonRDB::Table;
+
+use strict;
+
+use base qw( DB::Introspector::Base::Table );
+
+use constant COLUMN_NAME_COL => 'COLUMN_NAME';
+
+
+## ABSTRACT METHODS
+
+sub get_column_lookup_statement {
+    die("get_column_lookup_statement not defined");
+}
+
+sub get_foreign_keys_lookup_statement {
+    die("get_foreign_keys_lookup_statement not defined");
+}
+
+sub get_column_instance {
+    my $self = shift;
+    my $name = shift;
+    my $type = shift;
+    die("get_column_instance not defined");
+}
+
+sub get_foreign_key_class {
+    die("get_foreign_key_class not defined");
+}
+
+sub get_primary_key_column_ids {
+    die("get_primary_key_column_ids not defined");
+}
+
+## DEFINED METHODS
+
+sub primary_key {
+    my $self = shift;
+    
+    unless(defined $self->{_primary_key}) {
+        my @primary_key;
+        my @column_ids = $self->get_primary_key_column_ids;
+        my @columns = $self->columns;
+
+        foreach my $column_id (@column_ids) {
+            push(@primary_key, $columns[$column_id]); 
+        }
+        $self->{_primary_key} = \@primary_key;
+    }
+    return @{$self->{_primary_key}};
+} 
+
+sub new {
+    my $class = shift;
+    my $self = $class->SUPER::new(@_);
+    my $introspector = $_[2];
+
+    unless( UNIVERSAL::isa($introspector, 'DB::Introspector') ) {
+        die("$class constructor requires introspector");
+    }
+
+    $self->{_introspector} = $introspector;
+    $self;
+}
+
+sub _introspector {
+    my $self = shift;
+    return $self->{_introspector};
+}
+
+sub columns {
+    my $self = shift;
+
+    unless( defined $self->{'columns'} ) { 
+        my $sth = $self->get_column_lookup_statement();
+
+        my @columns;
+        while( my $row = $sth->fetchrow_hashref('NAME_uc') ) {
+            my $column = $self->get_column_instance(
+                $row->{NAME}, $row->{TYPE});
+                push(@columns, $column);
+        }
+        $sth->finish();
+
+        $self->{'columns'} = \@columns;
+    }
+
+    return @{$self->{'columns'}};
+}
+
+sub foreign_keys {
+    my $self = shift;
+
+    unless( defined $self->{'foreign_keys'} ) { 
+        $self->{'foreign_keys'} = $self->_lookup_foreign_keys;
+    }
+
+    return @{$self->{'foreign_keys'}};
+}
+
+sub _lookup_foreign_keys {
+    my $self = shift;
+    my $sth = $self->get_foreign_keys_lookup_statement();
+
+    my @foreign_keys;
+    while( my $row = $sth->fetchrow_hashref('NAME_uc') ) {
+        my $foreign_key = $self->get_foreign_key_class()->new($self, %$row);
+        push(@foreign_keys, $foreign_key);
+    }
+    $sth->finish();
+
+    return \@foreign_keys;
+}
+
+
+package DB::Introspector::CommonRDB::ForeignKey;
+
+use strict;
+
+use base qw( DB::Introspector::Base::ForeignKey );
+
+
+## ABSTRACT METHODS
+
+sub get_local_column_name_lookup_statement {
+    die("get_local_column_name_lookup_statement not defined");
+}
+
+sub get_foreign_column_name_lookup_statement {
+    die("get_foreign_column_name_lookup_statement not defined");
+}
+
+sub get_foreign_table_name_lookup_statement {
+    die("get_foreign_table_name_lookup_statement not defined");
+}
+
+
+## DEFINED METHODS
+
+sub local_column_names {
+    my $self = shift;
+
+    unless( defined $self->{'local_column_names'} ) {
+        my $sth = $self->get_local_column_name_lookup_statement();
+
+        my @local_column_names;
+        while( my $row = $sth->fetchrow_hashref('NAME_uc') ) {
+            push(@local_column_names, $row->{NAME});
+        }
+        $sth->finish();
+
+        $self->{'local_column_names'} = \@local_column_names;
+    }
+
+    return @{$self->{'local_column_names'}};
+} 
+
+sub foreign_column_names {
+    my $self = shift;
+
+    unless( defined $self->{'foreign_column_names'} ) {
+        $self->{'foreign_column_names'} = $self->_populate_foreign_column_names;
+    }
+
+    return @{$self->{'foreign_column_names'}};
+} 
+
+sub _populate_foreign_column_names {
+   my $self = shift;
+
+   my $sth = $self->get_foreign_column_name_lookup_statement();
+
+   my @foreign_column_names;
+   while( my $row = $sth->fetchrow_hashref('NAME_uc') ) {
+            push(@foreign_column_names, $row->{NAME});
+   }
+   $sth->finish();
+
+   return \@foreign_column_names;
+}
+
+sub set_foreign_column_names {
+    my $self = shift;
+    return unless(@_);
+
+    $self->{foreign_column_names} = shift;
+}
+
+sub set_local_column_names {
+    my $self = shift;
+    return unless(@_);
+
+    $self->{local_column_names} = shift;
+}
+
+sub set_foreign_table_name {
+    my $self = shift;
+    return unless(@_);
+
+    $self->{foreign_table_name} = shift;
+}
+
+sub foreign_table_name {
+    my $self = shift;
+
+    unless( defined $self->{'foreign_table_name'} ) {
+        my $sth = $self->get_foreign_table_name_lookup_statement();
+
+        my $row = $sth->fetchrow_hashref('NAME_uc');
+        $sth->finish();
+
+        $self->set_foreign_table_name($row->{NAME});
+    }
+
+    return $self->{'foreign_table_name'};
+} 
+
+sub foreign_table {
+    my $self = shift;
+
+    unless( defined $self->{'foreign_table'} ) {
+        $self->{'foreign_table'} = $self->local_table
+                                        ->_introspector
+                                        ->find_table($self->foreign_table_name);
+    }
+    return $self->{'foreign_table'};
+} 
+
+1;
