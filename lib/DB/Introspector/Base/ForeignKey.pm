@@ -20,12 +20,21 @@ sub local_column_names {
 sub new {
     my $class = shift;
     my $local_table = shift;
+    my $dependency = shift;
 
-    my $self = bless({_local_table => $local_table}, ref($class) || $class);
+    my $self = bless(
+        { _local_table   => $local_table, _is_dependency => $dependency },
+        ref($class) || $class);
 
 
     return $self;
 }
+
+sub is_dependency {
+    my $self = shift;
+    return $self->{_is_dependency};
+}
+
 
 
 sub local_table {
@@ -43,20 +52,23 @@ DB::Introspector::Base::ForeignKey
 
 =head1 SYNOPSIS
 
-=over 4
 
-use DB::Introspector;
+ use DB::Introspector;
 
-my $introspector = DB::Introspector->get_instance($dbh);
-my $table = $introspector->find_table('users');
+ my $introspector = DB::Introspector->get_instance($dbh);
 
-foreach my $foreign_key ($table->foreign_keys) {
+ my $table = $introspector->find_table('users');
+
+ foreach my $foreign_key ($table->foreign_keys) {
+
     print "Foreign Key name:\t".$foreign_key->name."\n";
-    print "Foreign Key local table:\t".$foreign_key->local_table->name."\n";
-    print "Foreign Key foreign table:\t".$foreign_key->foreign_table->name."\n";
-}
 
-=back
+    print "Foreign Key local table:\t".$foreign_key->local_table->name."\n";
+
+    print "Foreign Key foreign table:\t".$foreign_key->foreign_table->name."\n";
+
+ }
+
      
 =head1 DESCRIPTION
 
@@ -103,7 +115,7 @@ mapped to the foreign column names.
 
 =head1 METHODS
 
-
+=over 4
 
 =item DB::Introspector::Base::ForeignKey->new($local_table);
 
@@ -132,6 +144,8 @@ Returns: The child table in this foreign key relationship
 =back
 
 
+
+=back
 
 =head1 SEE ALSO
 

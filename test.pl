@@ -10,7 +10,6 @@ use Test::Unit::HarnessUnit;
 use IO::File;
 
 use DBI; 
-#DBI->trace(1);
 use DB::Introspector;
 use DB::Introspector::TableTest;
 use DB::Introspector::RelInspectTest;

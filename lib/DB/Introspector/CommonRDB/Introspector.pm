@@ -113,6 +113,10 @@ sub get_foreign_keys_lookup_statement {
     die("get_foreign_keys_lookup_statement not defined");
 }
 
+sub get_dependencies_lookup_statement {
+    die("get_dependencies_lookup_statement not defined");
+}
+
 sub get_column_instance {
     my $self = shift;
     my $name = shift;
@@ -122,6 +126,10 @@ sub get_column_instance {
 
 sub get_foreign_key_class {
     die("get_foreign_key_class not defined");
+}
+
+sub get_depenency_class {
+    die("get_depenency_class not defined");
 }
 
 sub get_primary_key_column_ids {
@@ -194,18 +202,46 @@ sub foreign_keys {
     return @{$self->{'foreign_keys'}};
 }
 
+sub dependencies {
+    my $self = shift;
+
+    unless( defined $self->{'dependencies'} ) {
+        $self->{'dependencies'} = $self->_lookup_dependencies;
+    }
+
+    return @{$self->{'dependencies'}};
+}
+
 sub _lookup_foreign_keys {
     my $self = shift;
     my $sth = $self->get_foreign_keys_lookup_statement();
 
     my @foreign_keys;
     while( my $row = $sth->fetchrow_hashref('NAME_uc') ) {
-        my $foreign_key = $self->get_foreign_key_class()->new($self, %$row);
+        my $foreign_key = $self->get_foreign_key_class()->new($self,0, %$row);
         push(@foreign_keys, $foreign_key);
     }
     $sth->finish();
 
     return \@foreign_keys;
+}
+
+sub _lookup_dependencies {
+    my $self = shift;
+    my $sth = $self->get_dependencies_lookup_statement();
+
+    my @dependencies;
+    while( my $row = $sth->fetchrow_hashref('NAME_uc') ) {
+        my $local_table = 
+            $self->_introspector->find_table( $row->{CHILD_TABLE_NAME} )
+            || die("no child table found for dependency");
+        my $dependency = $self->get_foreign_key_class()->new($local_table, 1,
+                                                             %$row);
+        push(@dependencies, $dependency);
+    }
+    $sth->finish();
+
+    return \@dependencies;
 }
 
 

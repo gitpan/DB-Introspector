@@ -10,6 +10,11 @@ sub new {
     return bless([], ref($class) || $class);
 }
 
+sub get_foreign_key_list {
+    my $self = shift;
+    return @$self;
+}
+
 sub clone {
     my $self = shift;
     my @new_path = @$self;
@@ -65,7 +70,8 @@ sub _to_array {
 
 sub head_table {
     my $self = shift;
-    return $self->head->foreign_table;
+    return ($self->head->is_dependency) 
+                ? $self->head->local_table : $self->head->foreign_table;
 }
 
 sub head_columns {
@@ -75,7 +81,8 @@ sub head_columns {
 
 sub tail_table {
     my $self = shift;
-    return $self->tail->local_table;
+    return ($self->tail->is_dependency) 
+                ? $self->tail->foreign_table : $self->tail->local_table;
 }
 
 sub tail_columns {

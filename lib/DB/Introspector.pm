@@ -117,25 +117,24 @@ DB::Introspector
 
 =head1 SYNOPSIS
 
-=over 4
+ use DB::Introspector;
+ 
+ my $introspector = DB::Introspector->get_instance($dbh);
+ 
+ my $table = $introspector->find_table('foo');
+ 
+ print $table->name;
+ 
+ foreach my $foreign_key ($table->foreign_keys) {
 
-use DB::Introspector;
+     print $foreign_key->foreign_table->name;
 
-my $introspector = DB::Introspector->get_instance($dbh);
+     print join(",",$foreign_key->foreign_column_names);
 
-my $table = $introspector->find_table('foo');
+ }
+ 
+ my @tables = $introspector->find_tables;
 
-print $table->name;
-
-foreach my $foreign_key ($table->foreign_keys) {
-    print $foreign_key->foreign_table->name;
-    print join(",",$foreign_key->foreign_column_names);
-}
-
-my @tables = $introspector->find_tables;
-
-=back
-     
 =head1 DESCRIPTION
 
 DB::Introspector looks into database metadata and derives detailed table level
@@ -178,7 +177,7 @@ Returns: An array (@) of DB::Introspector::Base::Table instances for each table 
 
 =back
 
-
+=back
 
 
 =head1 METHODS

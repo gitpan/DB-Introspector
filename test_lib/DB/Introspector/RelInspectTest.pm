@@ -6,7 +6,7 @@ use base qw( DB::IntrospectorBaseTest );
 use DB::Introspector::Util::RelInspect;
 
 
-sub test_find_paths_between_tables {
+sub test_find_mapped_paths_between_tables {
     my $self = shift;
 
     my $users               = $self->_introspector->find_table("users");
@@ -17,8 +17,8 @@ sub test_find_paths_between_tables {
     $self->assert(  defined $grouped_user_images, 
                     "table grouped_user_images is not defined" );
 
-    my $paths = DB::Introspector::Util::RelInspect->find_paths_between_tables(
-        $users, $grouped_user_images);
+    my $paths = DB::Introspector::Util::RelInspect
+              ->find_mapped_paths_between_tables( $users, $grouped_user_images);
 
     $self->assert( defined $paths, "paths is undefined" );
     $self->assert( @$paths == 1, "path length is ".@$paths." expected 1" );
@@ -46,5 +46,35 @@ sub test_find_paths_between_tables {
     }
 }
 
+sub test_find_path_between_two_tables {
+    my $self = shift;
+
+    my $users               = $self->_introspector->find_table("users");
+    my $groups               = $self->_introspector->find_table("groups");
+
+    $self->assert( defined $users, "table users is not defined" );
+    $self->assert( defined $groups, "table groups is not defined" );
+
+    my $paths = DB::Introspector::Util::RelInspect
+                        ->find_paths_between_two_tables( $users, $groups);
+
+    $self->assert( defined $paths, "paths is undefined" );
+    $self->assert( @$paths == 1, "path length is ".@$paths." expected 1" );
+
+
+    my ($path) = @$paths;
+    $self->assert( defined $path, "path is undefined" );
+
+    $self->assert( $path->length == 2,
+        "path length is " . $path->length . " when expected 2" );
+
+    $self->assert( $path->head_table->name eq $users->name,
+        "invalid table name found " . $path->head_table->name );
+
+    $self->assert( $path->tail_table->name eq $groups->name,
+        "invalid table name found " . $path->tail_table->name );
+
+
+}
 
 1;

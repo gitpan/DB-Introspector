@@ -32,6 +32,11 @@ sub primary_key {
     die("primary_key is not defined for ".(ref($self))); 
 }
 
+sub primary_key_names {
+    my $self = shift;
+    return map { $_->name; } $self->primary_key;
+}
+
 sub primary_key_column {
     my $self = shift;
     my $column_name = shift;
@@ -96,6 +101,11 @@ sub foreign_keys {
     # returns @ of foreign_keys
 }
 
+sub dependencies {
+    my $self = shift;
+    die("dependencies is not defined for ".(ref($self))); 
+}
+
 sub foreign_key_names {
     my $self = shift;
     return map { $_->name; } $self->foreign_keys;
@@ -124,26 +134,27 @@ DB::Introspector::Base::Table
 
 =head1 SYNOPSIS
 
-=over 4
+ use DB::Introspector;
+ 
+ my $table = $introspector->find_table('users');
 
-use DB::Introspector;
+ print "table name is: ".$table->name."\n";
+ 
+ foreach my $column ($table->columns) {
 
-my $table = $introspector->find_table('users');
-print "table name is: ".$table->name."\n";
+     print "column ".$column->name."\n";
 
-foreach my $column ($table->columns) {
-    print "column ".$column->name."\n";
-}
+ }
+ 
+ foreach my $foreign_key ($table->foreign_keys) {
 
-foreach my $foreign_key ($table->foreign_keys) {
-    print "foreign key ("
-        .join(",",$foreign_key->local_column_names).") -> "
-        .$foreign_key->foreign_table->name." ("
-        .join(",",$foreign_key->foreign_column_names).")\n";
-}
+     print "foreign key ("
+         .join(",",$foreign_key->local_column_names).") -> "
+         .$foreign_key->foreign_table->name." ("
+         .join(",",$foreign_key->foreign_column_names).")\n";
 
-=back
-     
+ }
+
 =head1 DESCRIPTION
 
 DB::Introspector::Base::Table is an abstract class that provides a higher level
@@ -181,6 +192,16 @@ is in the database from which they were extracted.
 =over 4
 
 Returns: an array (@) of DB::Introspector::Base::ForeignKey instances. 
+
+=back
+
+
+=item $table->dependencies
+
+=over 4
+
+Returns: an array (@) of DB::Introspector::Base::ForeignKey instances
+from the child tables to this table instance.
 
 =back
 

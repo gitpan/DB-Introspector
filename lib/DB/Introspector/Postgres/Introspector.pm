@@ -64,6 +64,7 @@ use DB::Introspector::Base::CLOBColumn;
 
 use constant COLUMN_CLASS_MAPPING => {
     'bool' => 'DB::Introspector::Base::BooleanColumn',
+    'int4' => 'DB::Introspector::Base::IntegerColumn',
     'int8' => 'DB::Introspector::Base::IntegerColumn',
     'bpchar' => 'DB::Introspector::Base::CharColumn',
     'varchar' => 'DB::Introspector::Base::StringColumn',
@@ -133,13 +134,31 @@ sub get_foreign_keys_lookup_statement {
     return $sth;
 }
 
+sub _lookup_dependencies {
+    my $self = shift;
+
+    my ($foreign_keys, $dependencies) = $self->_lookup_fk_triggers;
+
+    return $dependencies;
+}
 
 sub _lookup_foreign_keys {
+    my $self = shift;
+    my ($foreign_keys, $dependencies) = $self->_lookup_fk_triggers;
+
+    return $foreign_keys;
+}
+
+
+sub _lookup_fk_triggers {
     my $self = shift;
 
     my $sth = $self->get_foreign_keys_lookup_statement();
 
     my @foreign_keys;
+    my @dependencies;
+
+    my %visited_trigger;
 
     # I think the only way for us to know if we have a foreign key (as opposed
     # to another table referencing us) is to parse the arguments of the trigger
@@ -147,18 +166,33 @@ sub _lookup_foreign_keys {
     # name.  With the new dictionary tables (like pg_constraints) in Postgres
     # 7.3, I don't think we will have to do this.
     while( my $row = $sth->fetchrow_hashref('NAME_uc') ) {
-        my @column_args = split(COLUMN_ARG_DELIM, $row->{'ARGUMENTS'});
-        if( lc($column_args[1]) ne lc($self->name) ) {
+
+        # Since triggers appear more than once, but with different ids, this
+        # hack acts as a way to make these triggers unique.
+        if( $visited_trigger{$row->{ARGUMENTS}} ) {
             next;
+        } else {
+            $visited_trigger{$row->{ARGUMENTS}} = 1;
+        }
+        
+        my @column_args = split(COLUMN_ARG_DELIM, $row->{'ARGUMENTS'});
+        if( lc($column_args[1]) eq lc($self->name) ) {
+            # dealing with foreign keys referencing other tables
+            my $foreign_key = $self->get_foreign_key_class()
+                                                        ->new($self,0,%$row);
+            push(@foreign_keys, $foreign_key);
+        } elsif( lc($column_args[2]) eq lc($self->name) ) {
+            # dealing with dependencies referencing us
+            my $t = $self->_introspector->find_table($column_args[1]); 
+            my $foreign_key = $self->get_foreign_key_class()->new($t,1,%$row);
+            push(@dependencies, $foreign_key);
         }
 
-        my $foreign_key = $self->get_foreign_key_class()->new($self, %$row);
-        push(@foreign_keys, $foreign_key);
     }
 
     $sth->finish();
 
-    return \@foreign_keys;
+    return (\@foreign_keys, \@dependencies);
 }
 
 sub get_column_instance {
@@ -183,7 +217,7 @@ use base qw( DB::Introspector::CommonRDB::ForeignKey );
 
 sub new {
     my $class = shift;
-    my $self = $class->SUPER::new(shift());
+    my $self = $class->SUPER::new(shift(), shift());
 
     my %args = @_;
 

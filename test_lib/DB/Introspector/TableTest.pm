@@ -198,6 +198,75 @@ sub users_table {
 }
 
 
+{
+    my %dependencies = (
+        'users' => {
+            'grouped_users|user_id' => {
+                local_table => q(grouped_users),
+                local_column_names => [qw(user_id)],
+                foreign_column_names => [qw(user_id)],
+                foreign_table => q(users)
+            },
+        },
+        'grouped_users' => {
+            'grouped_user_images|group_id|user_id' => {
+                local_column_names => [qw(group_id user_id)],
+                foreign_column_names => [qw(group_id user_id)],
+                foreign_table => q(grouped_users),
+                local_table => q(grouped_user_images),
+            }
+        }
+    );
+
+    sub test_dependencies {
+        my $self = shift;
+
+        foreach my $table_name (keys %dependencies) {
+            my $table = $self->_introspector->find_table($table_name);
+#warn($table->name, " <- ", map {$_->local_table->name} $table->dependencies);
+#use Data::Dumper;
+#warn( Dumper [$table->dependencies] ); 
+
+            $self->assert(
+                $table->dependencies == keys %{$dependencies{$table_name}},
+                "incorrect number of dependencies for table ".$table->name."."
+                ." Found:"
+                    .scalar($table->dependencies)
+                ." Expected:".scalar(keys %{$dependencies{$table_name}}));
+
+            foreach my $foreign_key ($table->dependencies) {
+
+                my $local_columns = join("|", $foreign_key->local_column_names);
+                my $foreign_table = $foreign_key->foreign_table->name;
+                my $local_table = $foreign_key->local_table->name;
+                my $key = "$local_table|$local_columns";
+                my $test_data = $dependencies{$table_name}{$key};
+
+                $self->assert(defined $test_data, 
+                            "$key foreign key not found for table $table_name");
+
+                foreach my $method (keys %$test_data) {
+                    my (@values, @response);
+                    # if we have a reference we are dealing with an array
+                    if( ref($test_data->{$method}) ) { 
+                        @values = @{$test_data->{$method}};
+                        @response = $foreign_key->$method;
+                    # otherwise, we are dealing with a table name
+                    } else {
+                        @values = ($test_data->{$method});
+                        @response = $foreign_key->$method->name;
+                    }
+                    for my $index (0..$#values) {
+                     $self->assert($values[$index] eq $response[$index],
+                      "found $response[$index] when expecting $values[$index]");
+                    }
+                }
+            }
+        }
+    }
+
+}
+
 
 
 
