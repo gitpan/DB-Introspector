@@ -2,7 +2,7 @@ package DB::Introspector;
 
 use strict;
 
-$DB::Introspector::VERSION = '0.05';
+$DB::Introspector::VERSION = '0.06';
 
 use DBI;
 use Config::Properties;
@@ -218,7 +218,7 @@ DB::Introspector
           ." is pointing to me\n";
  }
  
- my @tables = $introspector->find_tables;
+ my @tables = $introspector->find_all_tables;
 
  # you can do other cool stuff; just read the docs.
 

@@ -35,7 +35,7 @@ sub serialize_to_file {
 sub deserialize {
     my $class = shift;
     my $fh = shift;
-    my $dbh = shift;
+    my $dbh = shift || die("\$class->deserialize(\$fh, \$dbh) requires a dbh");
 
     my $storage_ref = fd_retrieve($fh);
     if( $storage_ref->{dbname} ne _dbh_id($dbh) ) {

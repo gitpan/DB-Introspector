@@ -2,6 +2,11 @@ package DB::Introspector::Base::ForeignKey;
 
 use strict;
 
+use constant DELETE_RULE_NO_ACTION => 'NO ACTION';
+use constant DELETE_RULE_CASCADE => 'CASCADE';
+use constant DELETE_RULE_SET_NULL => 'SET NULL';
+use constant DELETE_RULE_SET_DEFAULT => 'SET DEFAULT';
+
 sub name { return ""; }
 
 sub foreign_table {
@@ -36,6 +41,10 @@ sub is_dependency {
     my $self = shift;
     return $self->{_is_dependency};
 }
+
+sub enabled { 1; }
+
+sub delete_rule { return DELETE_RULE_NO_ACTION; };
 
 
 

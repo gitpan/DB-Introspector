@@ -2,9 +2,6 @@ use strict;
 
 use ExtUtils::MakeMaker;
 
-my $VERSION = q(0.04);
-
-
 WriteMakefile(
     'NAME'          => 'DB::Introspector',
     'VERSION_FROM' => 'lib/DB/Introspector.pm',

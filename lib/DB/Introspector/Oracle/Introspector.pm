@@ -55,7 +55,12 @@ q(SELECT LOWER(column_name) AS NAME, data_type AS TYPE,
 
 # TODO add support for cross schema references
 use constant FOREIGN_KEYS_LOOKUP_QUERY =>
-q(SELECT constraint_name AS name FROM user_constraints 
+q(SELECT constraint_name AS name, 
+         DECODE(status,'DISABLED', 0, 1) AS enabled, 
+         DECODE(UPPER(delete_rule), NULL, 'NO ACTION', 
+                                   'RESTRICT', 'NO ACTION',
+                                   UPPER(delete_rule)) AS delete_rule
+  FROM user_constraints 
   WHERE constraint_type='R' 
     AND LOWER(table_name)=?
     AND owner=r_owner);
@@ -66,7 +71,12 @@ q(SELECT index_name AS name, uniqueness
   WHERE LOWER(table_name)=?);
 
 use constant DEPENDENCIES_LOOKUP_QUERY =>
-q(SELECT dep.constraint_name AS name, dep.table_name AS child_table_name
+q(SELECT dep.constraint_name AS name, 
+         dep.table_name AS child_table_name,
+         DECODE(dep.status,'DISABLED', 0, 1) AS enabled, 
+         DECODE(UPPER(dep.delete_rule), NULL, 'NO ACTION', 
+                                   'RESTRICT', 'NO ACTION',
+                                   UPPER(dep.delete_rule)) AS delete_rule
   FROM  user_constraints dep, 
         user_constraints ent
   WHERE dep.constraint_type = 'R'
@@ -74,11 +84,12 @@ q(SELECT dep.constraint_name AS name, dep.table_name AS child_table_name
     AND LOWER(ent.table_name) = ?);
 
 use constant PRIMARY_KEY_LOOKUP_QUERY =>
-q(SELECT LOWER(column_name) FROM user_cons_columns WHERE constraint_name IN (
-    SELECT constraint_name FROM user_constraints 
-        WHERE LOWER(table_name)=? 
-          AND constraint_type='P'
- ) ORDER BY position); 
+q(SELECT LOWER ( column_name )
+    FROM user_cons_columns JOIN user_constraints c
+         USING (constraint_name)
+    WHERE constraint_type='P'
+      AND LOWER(c.table_name)=?
+    ORDER BY position);
 
 use DB::Introspector::Base::BooleanColumn;
 use DB::Introspector::Base::SpecialColumn;
@@ -176,7 +187,7 @@ sub get_column_instance {
         # length is dependent on the number of acceptable characters in the
         # number
         my $max = '9' x $extra_data->{LENGTH};
-        if( defined $max ) {
+        if( defined($max) && $max =~ /^\d+$/ ) {
             return $class->new($name, -$max, $max);
         } else {
             return $class->new($name);
@@ -228,7 +239,19 @@ sub new {
     my $dependency = shift;
     my %args = @_;
     $self->{'_name'} = $args{'NAME'};
+    $self->{'_enabled'} = $args{'ENABLED'};
+    $self->{'_delete_rule'} = $args{'DELETE_RULE'};
     return $self;
+}
+
+sub delete_rule {
+    my $self = shift;
+    return $self->{'_delete_rule'};
+}
+
+sub enabled {
+    my $self = shift;
+    return $self->{'_enabled'};
 }
 
 sub name {
